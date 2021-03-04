@@ -1,20 +1,20 @@
 /*
-                _       _                             
-   __ _ _ __ __| |_   _(_)_ __   ___                  
-  / _` | '__/ _` | | | | | '_ \ / _ \                 
- | (_| | | | (_| | |_| | | | | | (_) |                
-  \__,_|_|  \__,_|\__,_|_|_| |_|\___/                 
-   __| | __ _| |_ __ _| | ___   __ _  __ _  ___ _ __  
-  / _` |/ _` | __/ _` | |/ _ \ / _` |/ _` |/ _ \ '__| 
- | (_| | (_| | || (_| | | (_) | (_| | (_| |  __/ |    
-  \__,_|\__,_|\__\__,_|_|\___/ \__, |\__, |\___|_|    
-                               |___/ |___/            
+                _       _
+   __ _ _ __ __| |_   _(_)_ __   ___
+  / _` | '__/ _` | | | | | '_ \ / _ \
+  | (_| | | | (_| | |_| | | | | | (_) |
+  \__,_|_|  \__,_|\__,_|_|_| |_|\___/
+   __| | __ _| |_ __ _| | ___   __ _  __ _  ___ _ __
+  / _` |/ _` | __/ _` | |/ _ \ / _` |/ _` |/ _ \ '__|
+  | (_| | (_| | || (_| | | (_) | (_| | (_| |  __/ |
+  \__,_|\__,_|\__\__,_|_|\___/ \__, |\__, |\___|_|
+                               |___/ |___/
 
-  This project logs data from a 0-5 volts (0-200 psi) pressure transducer.  
-  The log is stored on a file on the SD card, a time stamp is created based 
+  This project logs data from a 0-5 volts (0-200 psi) pressure transducer.
+  The log is stored on a file on the SD card, a time stamp is created based
   on the time and date, from the RTC.  The case has two buttons and LED for
-  user interaction, start logging, stop logging, error messages etc.  
-  The 0-5 volt pin is connected to the ADC on the arduion which is a 
+  user interaction, start logging, stop logging, error messages etc.
+  The 0-5 volt pin is connected to the ADC on the arduion which is a
   10 bit adc,  or 1024 steps.
   version 0.1 - 3/3/2021 First working revision
 
@@ -76,6 +76,12 @@ void setup() {
   lcd.backlight();
   lcd.setCursor(0, 0);
   lcd.print("datalogger ver 0.1");
+  lcd.setCursor(0, 1);
+  lcd.print("MARCH 4, 2021");
+  lcd.setCursor(0, 2);
+  lcd.print("JEFF WATTS");
+  delay(1000);
+
 
   // initialize the LED pin as an output:
   pinMode(redLedPin, OUTPUT);
@@ -90,7 +96,7 @@ void setup() {
   //Begin RTC and check to see if its working at same time
   Wire.begin();
   if (! rtc.begin()) {
-    lcd.setCursor(0, 0);
+    lcd.setCursor(0, 1);
     lcd.print("Couldn't find RTC");
     lcd.setCursor(0, 1);
     lcd.print("Maybe dead battery");
@@ -147,34 +153,27 @@ void loop() {
       lcd.setCursor(0, 0);
       lcd.print("    PSI");
       lcd.setCursor(0, 1);
-      lcd.print("Green to log to SD");
+      lcd.print("STATUS: STANDBY");
+      lcd.setCursor(0, 3);
+      lcd.print("GREEN TO LOG TO SD");
     }
 
-    //    sensorValue = analogRead(sensorPin);
-    //*************************************************************************
-    //  This code is for testing the sensor input logic remove after verified
-    //*************************************************************************
-    if (sensorValue > 1024) {
-      sensorValue = 0;
-    } else {
-      sensorValue = sensorValue + 50;
-    }
-    //**************************************************************************
+    // read analog pin once, then read again for more accuracy
+    analogRead(sensorPin);
+    delay(10);
+    sensorValue = analogRead(sensorPin);
 
 
     float psiFloat = sensorValue * sensorMultiplierM + sensorAdderB; //y=mx+b  value from testing
     int psiInt = round(psiFloat);
     lcd.setCursor(0, 0);
     lcd.print("   ");
-    if (psiInt > 99) { // position the pressure reading based on how long 1, 2, or 3 digits
-      lcd.setCursor(0, 0);
-    } else if (psiInt > 9) {
-      lcd.setCursor(1, 0);
-    } else {
-      lcd.setCursor(2, 0);
-    }
-
+    lcd.setCursor(0, 0);
     lcd.print(psiInt);
+    lcd.setCursor(8, 0);
+    lcd.print("   ");
+    lcd.setCursor(8, 0);
+    lcd.print(sensorValue);
 
     digitalWrite(greenLedPin, HIGH);  // solid green led to indicate not logging but in a good state
     updateTimeOnLCD();
@@ -196,7 +195,10 @@ void logging() {
   lcd.print(filename);
   lcd.setCursor(0, 0);
   lcd.print("    PSI");
+  lcd.setCursor(0, 1);
+  lcd.print("STATUS:LOGGING TO SD");
   headerPrinted = false;   // used for lcd print header on main screen
+
   while (redButtonState == LOW) {
     unsigned long currentMillis = millis();
 
@@ -204,34 +206,20 @@ void logging() {
       previousMillis = currentMillis;
       updateTimeOnLCD();
 
-      //read analog pin once, then read again for more accuracy
-      //      analogRead(sensorPin);
-      //      delay(10);
-      //      sensorValue = analogRead(sensorPin);
+      // read analog pin once, then read again for more accuracy
+      analogRead(sensorPin);
+      delay(10);
+      sensorValue = analogRead(sensorPin);
 
-      //*************************************************************************
-      //  This code is for testing the sensor input logic remove after verified
-      //*************************************************************************
-      if (sensorValue > 1024) {
-        sensorValue = 0;
-      } else {
-        sensorValue = sensorValue + 50;
-      }
-      //**************************************************************************
       float psiFloat = sensorValue * sensorMultiplierM + sensorAdderB; //y=mx+b  value from
       int psiInt = round(psiFloat);
+      lcd.setCursor(0, 0);
       lcd.print("   ");
-
-      if (psiInt > 99) { // position the pressure reading based on how long 1, 2, or 3 digits
-        lcd.setCursor(0, 0);
-      } else if (psiInt > 9) {
-        lcd.setCursor(1, 0);
-      } else {
-        lcd.setCursor(2, 0);
-      }
       lcd.print(psiInt);
+      lcd.print("-");
+      lcd.print(sensorValue);
       lcd.setCursor(0, 3);
-      lcd.print("Logging Red to stop");
+      lcd.print("LOGGING RED TO STOP");
       greenButtonState = digitalRead(greenButtonPin);
       redButtonState = digitalRead(redButtonPin);
       if (greenLEDState == LOW) {
@@ -261,7 +249,7 @@ void logging() {
         // log time
         dataFile.print(now.unixtime()); // seconds since 1/1/1970
         dataFile.print(", ");
-//        dataFile.print('"');  //add quotes around the date/time
+        //        dataFile.print('"');  //add quotes around the date/time
         dataFile.print(now.year(), DEC);
         dataFile.print("/");
         dataFile.print(now.month(), DEC);
@@ -273,7 +261,7 @@ void logging() {
         dataFile.print(now.minute(), DEC);
         dataFile.print(":");
         dataFile.print(now.second(), DEC);
-//        dataFile.print('"');
+        //        dataFile.print('"');
         dataFile.print(", ");
         dataFile.print(sensorValue);
         dataFile.print(", ");
@@ -284,22 +272,21 @@ void logging() {
         delay(10);
         int refReading = analogRead(bandGapRef);
         float supplyvoltage = (bandGapVoltage * 1024) / refReading;
-
         dataFile.print(", ");
         dataFile.println(supplyvoltage);
-
         dataFile.close();
-
         digitalWrite(redLedPin, LOW);
 
       } else { // if the SD card didn't open turn on red LED and continue
-        lcd.setCursor(0, 1);
-        lcd.print("SD Card error");
-
+        lcd.setCursor(7, 1);
+        lcd.print("SD ERROR    ");
         digitalWrite(redLedPin, HIGH);
+
+
       }
     }
   }
+
 }
 void updateTimeOnLCD() {
   now = rtc.now(); // Get the current time
