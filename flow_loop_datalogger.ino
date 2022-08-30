@@ -1,4 +1,4 @@
-/*
+/* Working Version
                 _       _
    __ _ _ __ __| |_   _(_)_ __   ___
   / _` | '__/ _` | | | | | '_ \ / _ \
@@ -17,6 +17,8 @@
   The 0-5 volt pin is connected to the ADC on the arduion which is a
   10 bit adc,  or 1024 steps.
   version 0.1 - 3/3/2021 First working revision
+  version 0.2 - 3/5/2021 error handling SD card not pressent (didn't work)
+  Version 0.3 - 8/30/2022 Changed from 2 samples per seconds to 10 sample per second (line 40)
 
 */
 
@@ -27,12 +29,15 @@
 #include "RTClib.h"
 
 
+//use this LCD line for LCD Backpack  - I2C address 0x20
+//LiquidCrystal_I2C lcd(0x27, 20, 4); // set the LCD address to 0x27, 20 chars, 4 row display
+//use this LCD line for DFROBOT LCD - 0x20
+LiquidCrystal_I2C lcd(0x20, 20, 4); // set the LCD address to 0x27, 20 chars, 4 row display. Address could also be 0x20 if the screen is blank
 
-LiquidCrystal_I2C lcd(0x27, 20, 4); // set the LCD address to 0x27, 20 chars, 4 row display
 RTC_PCF8523 rtc;
 DateTime now;
 unsigned long previousMillis = 0;
-unsigned long intervalDelay = 500;
+unsigned long intervalDelay = 100;  //This is the time between writes to the SD card in milliseconds 500 = .5 seconds
 
 // constants won't change. They're used here to set pin numbers:
 const int greenButtonPin = 1; // the number of the pushbutton pin green
@@ -46,10 +51,11 @@ const float bandGapVoltage = 1.1; // this is not super guaranteed but its not -t
 int sensorValue = 0;  // variable to store the value coming from the sensor
 char filename[16];
 bool printedFileHeader = false;
+bool sdNotPresentError = false;
 // these M and B values are obtained by solving the y=mx+b of the sensor when put under different pressures
 // and logged,  you can do this in excel and use a scatter plot, and trendline, or the excel linest function
-const float sensorMultiplierM = .2355; // Y=MX+B, this equals the M, Obtained
-const float sensorAdderB = .421; // Y-Intercept or B in Y=MX+B
+const float sensorMultiplierM = 0.2413; // (.2355) Y=MX+B, this equals the M, 
+const float sensorAdderB = 0.0; // (.421) Y-Intercept or B in Y=MX+B
 
 char daysOfTheWeek[7][12] = {"Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"};
 
@@ -68,19 +74,18 @@ SdFile root;
 
 void setup() {
 
-
   // put your setup code here, to run once:
   lcd.init();                      // initialize the lcd
 
   // Print a message to the LCD.
   lcd.backlight();
   lcd.setCursor(0, 0);
-  lcd.print("datalogger ver 0.1");
+  lcd.print("datalogger ver 0.3");
   lcd.setCursor(0, 1);
-  lcd.print("MARCH 4, 2021");
+  lcd.print("MARCH 5, 2021");
   lcd.setCursor(0, 2);
   lcd.print("JEFF WATTS");
-  delay(1000);
+  delay(2000);
 
 
   // initialize the LED pin as an output:
@@ -199,7 +204,9 @@ void logging() {
   lcd.print("STATUS:LOGGING TO SD");
   headerPrinted = false;   // used for lcd print header on main screen
 
-  while (redButtonState == LOW) {
+  sdNotPresentError = false;
+
+  while (redButtonState == LOW ) {
     unsigned long currentMillis = millis();
 
     if (currentMillis - previousMillis > intervalDelay) {
@@ -214,10 +221,16 @@ void logging() {
       float psiFloat = sensorValue * sensorMultiplierM + sensorAdderB; //y=mx+b  value from
       int psiInt = round(psiFloat);
       lcd.setCursor(0, 0);
-      lcd.print("   ");
+      lcd.print("   ");  //clear out old psi reading
+      if (psiInt > 99) {
+        lcd.setCursor(0, 0);
+      } else if (psiInt > 9) {
+        lcd.setCursor(1, 0);
+      } else {
+        lcd.setCursor(2, 0);
+      }
+
       lcd.print(psiInt);
-      lcd.print("-");
-      lcd.print(sensorValue);
       lcd.setCursor(0, 3);
       lcd.print("LOGGING RED TO STOP");
       greenButtonState = digitalRead(greenButtonPin);
@@ -279,14 +292,11 @@ void logging() {
 
       } else { // if the SD card didn't open turn on red LED and continue
         lcd.setCursor(7, 1);
-        lcd.print("SD ERROR    ");
+        lcd.print("SD ERROR     ");
         digitalWrite(redLedPin, HIGH);
-
-
       }
     }
   }
-
 }
 void updateTimeOnLCD() {
   now = rtc.now(); // Get the current time
